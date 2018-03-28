@@ -1,0 +1,59 @@
+import com.github.siasia.{WebPlugin, PluginKeys, Container}
+import sbt._
+import PluginKeys._
+import WebPlugin._
+import Keys._
+
+object build extends Build {
+
+  val glueWeb = Container("glue")
+
+  def glueSettings: Seq[Setting[_]] = 
+    Seq(
+      resolvers += "Sonatype Repo" at "http://oss.sonatype.org/content/groups/public/",
+      libraryDependencies ++= {
+        val liftVersion = "2.4"
+        Seq(
+          "junit" % "junit" % "4.8" % "test->default",
+          "javax.servlet" % "servlet-api" % "2.5" % "provided->default",
+          "net.liftweb" % "lift-webkit_2.9.1" % liftVersion % "compile->default",
+          "net.liftweb" % "lift-mapper_2.9.1" % liftVersion % "compile->default",
+          "org.slf4j" % "slf4j-simple" % "1.6.4",
+          "org.eclipse.jetty" % "jetty-webapp" % "7.5.4.v20111024" % "container, test",
+          "org.seleniumhq.selenium" % "selenium-java" % "2.27.0",
+          "org.scalatest" % "scalatest_2.9.1" % "1.8" % "test",
+          "cc.co.scala-reactive" % "reactive-core_2.9.1" % "0.2-SNAPSHOT",
+          "net.databinder.dispatch" %% "core" % "0.9.1",
+          "org.jmock" % "jmock-junit4" % "2.5.1",
+          "org.jmock" % "jmock-legacy" % "2.5.1",
+        )
+      },
+      port in glueWeb.Configuration := 8081,
+      webappResources in Compile <+= (sourceDirectory in Runtime)(sd => sd / "static"),
+      parallelExecution in Test := false, // Because Lift doesn't like it
+      fork in Test := false,
+      javaOptions in Test += "-Dcom.sun.management.jmxremote=true",
+      javaOptions in Test += "-Dcom.sun.management.jmxremote.port=20000",
+      javaOptions in Test += "-Dcom.sun.management.jmxremote.ssl=false",
+      javaOptions in Test += "-Dcom.sun.management.jmxremote.authenticate=false",
+      testOptions in Test := Seq(Tests.Filter(testFilter)),
+      testOptions in GuiTest := Seq(Tests.Filter(guiFilter)),
+      testOptions in NonGuiTest := Seq(Tests.Filter(nonGuiFilter))
+    ) ++ webSettings
+
+  lazy val glue = Project(id = "glue3",
+    base = file("."))
+      .configs(GuiTest)
+      .configs(NonGuiTest)
+      .settings(glueSettings: _*)
+      .settings(inConfig(GuiTest)(Defaults.testTasks) : _*)
+      .settings(inConfig(NonGuiTest)(Defaults.testTasks) : _*)
+
+  def testFilter(name: String): Boolean = name endsWith "Test"
+  def guiFilter(name: String): Boolean = (name endsWith "GuiTest")
+  def nonGuiFilter(name: String): Boolean = testFilter(name) && !guiFilter(name)
+
+  lazy val GuiTest = config("gui") extend(Test)
+  lazy val NonGuiTest = config("nonGui") extend(Test)
+}
+//TODO: Stop regenerating IntelliJ project from sbt
